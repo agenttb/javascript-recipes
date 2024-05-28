@@ -17,6 +17,13 @@ interface TaxData {
     month: string;
 }
 
+interface FundAndInsurance {
+    housingFund: number;
+    pensionInsurance: number;
+    medicalInsurance: number;
+    unemploymentInsurance: number;
+}
+
 const taxBrackets: TaxBracket[] = [
     { upperLimit: 3000, rate: 0.03, quickDeduction: 0 },
     { upperLimit: 12000, rate: 0.10, quickDeduction: 210 },
@@ -26,10 +33,37 @@ const taxBrackets: TaxBracket[] = [
     { upperLimit: 80000, rate: 0.35, quickDeduction: 7160 },
     { upperLimit: Infinity, rate: 0.45, quickDeduction: 15160 }
 ];
+const fundAndInsuranceMap : Map<string, FundAndInsurance> = new Map();
+fundAndInsuranceMap.set('shanghai',
+    {
+        housingFund: 0.07,
+        pensionInsurance: 0.08,
+        medicalInsurance: 0.02,
+        unemploymentInsurance: 0.005
+    });
 
-function taxedSalary(salaryBeforeTax: number): TaxData[] {
+const cityLists = [
+    { "label": "上海", "value": "shanghai" },
+    { "label": "北京", "value": "beijing" },
+    { "label": "深圳", "value": "shenzhen" },
+    { "label": "广州", "value": "guangzhou" },
+    { "label": "南京", "value": "nanjing" }
+]
+
+
+function calcGrossDeduction(salaryBeforeTax: number, city: string, fundBase: number): number {
+    const fundAndInsurance = fundAndInsuranceMap.get(city);
+    const housingFund = fundAndInsurance.housingFund * fundBase;
+    const pensionInsurance = fundAndInsurance.pensionInsurance * fundBase;
+    const medicalInsurance = fundAndInsurance.medicalInsurance * fundBase;
+    const unemploymentInsurance = fundAndInsurance.unemploymentInsurance * fundBase;
+    return housingFund + pensionInsurance + medicalInsurance + unemploymentInsurance;
+}
+
+function taxedSalary(salaryBeforeTax: number, city: string, fundBase: number): TaxData[] {
     const taxedSalary = [] as TaxData[];
-    const result = calculateTaxedSalary(salaryBeforeTax);
+    const grossDeduction = calcGrossDeduction(salaryBeforeTax, city, fundBase);
+    const result = calculateTaxedSalary(salaryBeforeTax - grossDeduction);
     const data  = {} as TaxData;
     data.salaryAfterTax = result.toString();
     data.salaryBeforeTax = salaryBeforeTax .toString();
@@ -55,22 +89,19 @@ function calculateTaxedSalary(grossSalary: number): number {
 }
 
 
+
+
+
 const App: React.FC = () => {
     const [form] = Form.useForm();
     const [tableData, setTableData] =
         useState<TaxData[]>([]);
 
-    const onFinish = (values: { select: string; salaryInput: string }) => {
-        setTableData([...tableData, ...taxedSalary(parseInt(values.salaryInput))]);
+    const onFinish = (values: { city: string; salaryInput: number; fundBase: number }) => {
+        setTableData([...tableData, ...taxedSalary(values.salaryInput, values.city, values.fundBase)]);
         form.resetFields(); // 清空表单字段
     };
-    const cityLists = [
-        { "label": "上海", "value": "shanghai" },
-        { "label": "北京", "value": "beijing" },
-        { "label": "深圳", "value": "shenzhen" },
-        { "label": "广州", "value": "guangzhou" },
-        { "label": "南京", "value": "nanjing" }
-    ]
+
     const columns = [
         {
             title: '月份',
@@ -94,7 +125,7 @@ const App: React.FC = () => {
         <div style={{ padding: '50px' }}>
             <Form form={form} layout="vertical" onFinish={onFinish}>
                 <Form.Item
-                    name="select"
+                    name="city"
                     label="请选择城市"
                     rules={[{ required: true, message: '请选择一个城市' }]}
                 >
@@ -109,6 +140,13 @@ const App: React.FC = () => {
                 <Form.Item
                     name="salaryInput"
                     label="请输入税前薪资"
+                    rules={[{ required: true, message: '请输入内容' }]}
+                >
+                    <InputNumber addonBefore={<UserOutlined />} prefix="￥" style={{ width: '100%' }} />
+                </Form.Item>
+                <Form.Item
+                    name="fundBase"
+                    label="社保汇缴基数"
                     rules={[{ required: true, message: '请输入内容' }]}
                 >
                     <InputNumber addonBefore={<UserOutlined />} prefix="￥" style={{ width: '100%' }} />
